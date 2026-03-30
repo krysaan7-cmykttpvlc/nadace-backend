@@ -106,12 +106,8 @@ router.post('/', authenticate, requireApproved, upload.array('attachments', 10),
   body('summary').trim().notEmpty().withMessage('Shrnutí je povinné.'),
   body('description').trim().notEmpty().withMessage('Popis je povinný.'),
   body('benefitForCity').trim().notEmpty().withMessage('Přínos pro město je povinný.'),
-  body('targetGroup').trim().notEmpty().withMessage('Cílová skupina je povinná.'),
-  body('location').trim().notEmpty().withMessage('Místo realizace je povinné.'),
-  body('estimatedBudget').isFloat({ min: 0 }).withMessage('Rozpočet musí být kladné číslo.'),
   body('requestedSupport').isFloat({ min: 0 }).withMessage('Požadovaná podpora musí být kladné číslo.'),
   body('realizationDate').trim().notEmpty().withMessage('Termín realizace je povinný.'),
-  body('implementedBy').trim().notEmpty().withMessage('Realizátor je povinný.'),
   body('declaration').equals('true').withMessage('Čestné prohlášení je povinné.'),
 ], async (req, res) => {
   const errors = validationResult(req);
@@ -127,20 +123,11 @@ router.post('/', authenticate, requireApproved, upload.array('attachments', 10),
         summary: data.summary,
         description: data.description,
         benefitForCity: data.benefitForCity,
-        targetGroup: data.targetGroup,
-        location: data.location,
-        estimatedBudget: parseFloat(data.estimatedBudget),
         requestedSupport: parseFloat(data.requestedSupport),
         realizationDate: data.realizationDate,
-        implementedBy: data.implementedBy,
         isLongTerm: data.isLongTerm === 'true',
         declaration: true,
-        operatingCosts: data.operatingCosts || null,
-        maintainedBy: data.maintainedBy || null,
-        mainRisks: data.mainRisks || null,
-        previouslyDiscussed: data.previouslyDiscussed || null,
         publicInterest: data.publicInterest !== 'false',
-        estimatedBeneficiaries: data.estimatedBeneficiaries ? parseInt(data.estimatedBeneficiaries) : null,
         category: data.category || 'OTHER',
         budgetSize: data.budgetSize || 'MEDIUM',
         status: 'SUBMITTED',
@@ -369,6 +356,48 @@ router.post('/:id/request-completion', authenticate, requireRole('ADMIN', 'PROJE
   } catch (error) {
     console.error('Request completion error:', error);
     res.status(500).json({ error: 'Chyba při žádosti o doplnění.' });
+  }
+});
+
+// ==================== ADMIN - INTERNÍ ÚDAJE PROJEKTU ====================
+router.patch('/:id/internal', authenticate, requireRole('ADMIN', 'PROJECT_REVIEWER'), async (req, res) => {
+  try {
+    const project = await prisma.project.findUnique({ where: { id: req.params.id } });
+    if (!project) return res.status(404).json({ error: 'Projekt nenalezen.' });
+
+    const {
+      targetGroup, location, estimatedBudget, implementedBy,
+      operatingCosts, maintainedBy, mainRisks, previouslyDiscussed, estimatedBeneficiaries,
+    } = req.body;
+
+    const updated = await prisma.project.update({
+      where: { id: req.params.id },
+      data: {
+        targetGroup: targetGroup || null,
+        location: location || null,
+        estimatedBudget: estimatedBudget ? parseFloat(estimatedBudget) : null,
+        implementedBy: implementedBy || null,
+        operatingCosts: operatingCosts || null,
+        maintainedBy: maintainedBy || null,
+        mainRisks: mainRisks || null,
+        previouslyDiscussed: previouslyDiscussed || null,
+        estimatedBeneficiaries: estimatedBeneficiaries ? parseInt(estimatedBeneficiaries) : null,
+      },
+    });
+
+    await logAudit({
+      userId: project.authorId,
+      adminId: req.user.id,
+      action: 'PROJECT_INTERNAL_UPDATED',
+      entity: 'Project',
+      entityId: req.params.id,
+      ipAddress: req.ip,
+    });
+
+    res.json({ message: 'Interní údaje projektu uloženy.', project: { id: updated.id } });
+  } catch (error) {
+    console.error('Update project internal error:', error);
+    res.status(500).json({ error: 'Chyba při ukládání interních údajů.' });
   }
 });
 
