@@ -61,6 +61,7 @@ const passwordResetLimiter = rateLimit({
 });
 app.use('/api/auth/forgot-password', passwordResetLimiter);
 app.use('/api/auth/reset-password', passwordResetLimiter);
+app.use('/api/auth/resend-verification', passwordResetLimiter);
 
 // ==================== MIDDLEWARE ====================
 app.use(express.json({ limit: '10mb' }));

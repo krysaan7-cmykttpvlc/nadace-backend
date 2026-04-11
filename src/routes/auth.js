@@ -118,6 +118,46 @@ router.get('/verify-email', async (req, res) => {
   }
 });
 
+// ==================== ZNOVUODESLÁNÍ OVĚŘOVACÍHO E-MAILU ====================
+router.post('/resend-verification', [
+  body('email').isEmail().withMessage('Neplatný e-mail.'),
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+
+  try {
+    const { email } = req.body;
+    const user = await prisma.user.findUnique({ where: { email } });
+
+    // Nikdy nezveřejňujeme, zda e-mail v systému je nebo není
+    if (!user || user.emailVerified) {
+      return res.json({ message: 'Pokud účet existuje a není ověřený, e-mail byl odeslán.' });
+    }
+
+    // Vygeneruj nový token
+    const newToken = uuidv4();
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { emailVerifyToken: newToken },
+    });
+
+    await sendVerificationEmail(email, newToken);
+
+    await logAudit({
+      userId: user.id,
+      action: 'VERIFICATION_RESENT',
+      entity: 'User',
+      entityId: user.id,
+      ipAddress: req.ip,
+    });
+
+    res.json({ message: 'Pokud účet existuje a není ověřený, e-mail byl odeslán.' });
+  } catch (error) {
+    console.error('Resend verification error:', error);
+    res.status(500).json({ error: 'Chyba při odesílání e-mailu.' });
+  }
+});
+
 // ==================== PŘIHLÁŠENÍ ====================
 router.post('/login', [
   body('email').isEmail().withMessage('Neplatný e-mail.'),

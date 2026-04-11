@@ -86,6 +86,13 @@ router.patch('/:id/status', authenticate, requireRole('ADMIN', 'REGISTRATION_MAN
     };
 
     if (status === 'APPROVED') {
+      // Bezpečnostní pojistka: nesmíme schválit někoho, kdo si neověřil e-mail.
+      // Jinak by admin mohl omylem aktivovat fake účet.
+      if (!user.emailVerified) {
+        return res.status(400).json({
+          error: 'Uživatel si dosud neověřil svůj e-mail. Schválení není možné.',
+        });
+      }
       updateData.approvalDate = new Date();
       updateData.approvalNote = note || null;
       updateData.memberSince = new Date();
