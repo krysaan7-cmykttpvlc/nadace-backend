@@ -282,6 +282,82 @@ router.patch('/me', authenticate, async (req, res) => {
   }
 });
 
+// ==================== SMAZÁNÍ VLASTNÍHO ÚČTU (GDPR – právo na výmaz) ====================
+// Provádí anonymizaci, ne hard delete, aby zůstala zachována integrita projektů/hlasů/komentářů.
+router.delete('/me', authenticate, [
+  body('password').notEmpty().withMessage('Pro smazání účtu je nutné zadat heslo.'),
+  body('confirm').equals('SMAZAT').withMessage('Pro potvrzení napište SMAZAT.'),
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+
+  try {
+    const { password } = req.body;
+    const valid = await bcrypt.compare(password, req.user.passwordHash);
+    if (!valid) {
+      return res.status(401).json({ error: 'Nesprávné heslo.' });
+    }
+
+    // Nedovol smazat posledního admina
+    if (req.user.role === 'ADMIN') {
+      const adminCount = await prisma.user.count({ where: { role: 'ADMIN' } });
+      if (adminCount <= 1) {
+        return res.status(400).json({ error: 'Nelze smazat posledního administrátora. Nejdřív jmenujte jiného.' });
+      }
+    }
+
+    const anonEmail = `deleted-${req.user.id}@deleted.local`;
+    const randomHash = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 12);
+
+    await prisma.user.update({
+      where: { id: req.user.id },
+      data: {
+        email: anonEmail,
+        passwordHash: randomHash,
+        firstName: 'Smazaný',
+        lastName: 'uživatel',
+        phone: '',
+        addressStreet: null,
+        addressCity: '-',
+        addressZip: null,
+        isPermanentResident: false,
+        emailVerifyToken: null,
+        emailVerified: false,
+        passwordResetToken: null,
+        passwordResetExpires: null,
+        twoFactorSecret: null,
+        twoFactorEnabled: false,
+        lastLoginIp: null,
+        registrationStatus: 'BLOCKED',
+        role: 'USER',
+        trustLevel: 'NEW_MEMBER',
+        internalNote: 'Účet smazán na žádost uživatele (GDPR čl. 17).',
+        rejectionReason: null,
+        approvalNote: null,
+      },
+    });
+
+    // Smazat osobně vázané podporné záznamy, které nejsou potřeba pro integritu
+    await prisma.notification.deleteMany({ where: { userId: req.user.id } });
+
+    await logAudit({
+      userId: req.user.id,
+      action: 'ACCOUNT_DELETED_SELF',
+      entity: 'User',
+      entityId: req.user.id,
+      ipAddress: req.ip,
+      details: 'Anonymizace na žádost uživatele (GDPR právo na výmaz).',
+    });
+
+    res.json({ message: 'Váš účet byl smazán. Vaše osobní údaje byly anonymizovány.' });
+  } catch (error) {
+    console.error('Delete account error:', error);
+    res.status(500).json({ error: 'Chyba při mazání účtu.' });
+  }
+});
+
 // ==================== ZMĚNA HESLA ====================
 router.post('/change-password', authenticate, [
   body('currentPassword').notEmpty().withMessage('Současné heslo je povinné.'),
