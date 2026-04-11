@@ -360,29 +360,86 @@ router.post('/:id/request-completion', authenticate, requireRole('ADMIN', 'PROJE
 });
 
 // ==================== ADMIN - INTERNÍ ÚDAJE PROJEKTU ====================
-router.patch('/:id/internal', authenticate, requireRole('ADMIN', 'PROJECT_REVIEWER'), async (req, res) => {
+// Admin edit of main project fields (the ones submitted by member)
+router.patch('/:id', authenticate, requireRole('ADMIN', 'PROJECT_REVIEWER'), async (req, res) => {
   try {
     const project = await prisma.project.findUnique({ where: { id: req.params.id } });
     if (!project) return res.status(404).json({ error: 'Projekt nenalezen.' });
 
     const {
-      targetGroup, location, estimatedBudget, implementedBy,
-      operatingCosts, maintainedBy, mainRisks, previouslyDiscussed, estimatedBeneficiaries,
+      title, summary, description, benefitForCity,
+      requestedSupport, realizationDate, budgetSize, category,
     } = req.body;
+
+    const data = {};
+    if (title !== undefined) data.title = title;
+    if (summary !== undefined) data.summary = summary;
+    if (description !== undefined) data.description = description;
+    if (benefitForCity !== undefined) data.benefitForCity = benefitForCity;
+    if (requestedSupport !== undefined) data.requestedSupport = parseFloat(requestedSupport);
+    if (realizationDate !== undefined) data.realizationDate = realizationDate;
+    if (budgetSize !== undefined) data.budgetSize = budgetSize;
+    if (category !== undefined) data.category = category;
 
     const updated = await prisma.project.update({
       where: { id: req.params.id },
-      data: {
-        targetGroup: targetGroup || null,
-        location: location || null,
-        estimatedBudget: estimatedBudget ? parseFloat(estimatedBudget) : null,
-        implementedBy: implementedBy || null,
-        operatingCosts: operatingCosts || null,
-        maintainedBy: maintainedBy || null,
-        mainRisks: mainRisks || null,
-        previouslyDiscussed: previouslyDiscussed || null,
-        estimatedBeneficiaries: estimatedBeneficiaries ? parseInt(estimatedBeneficiaries) : null,
-      },
+      data,
+    });
+
+    await logAudit({
+      userId: project.authorId,
+      adminId: req.user.id,
+      action: 'PROJECT_DETAIL_UPDATED',
+      entity: 'Project',
+      entityId: req.params.id,
+      ipAddress: req.ip,
+    });
+
+    res.json({ message: 'Projekt aktualizován.', project: { id: updated.id } });
+  } catch (error) {
+    console.error('Update project error:', error);
+    res.status(500).json({ error: 'Chyba při aktualizaci projektu.' });
+  }
+});
+
+router.patch('/:id/internal', authenticate, requireRole('ADMIN', 'PROJECT_REVIEWER'), async (req, res) => {
+  try {
+    const project = await prisma.project.findUnique({ where: { id: req.params.id } });
+    if (!project) return res.status(404).json({ error: 'Projekt nenalezen.' });
+
+    const b = req.body;
+    const data = {};
+
+    // Pole původně vyplňovaná členem (admin je může přepsat)
+    if (b.title !== undefined) data.title = b.title;
+    if (b.summary !== undefined) data.summary = b.summary;
+    if (b.description !== undefined) data.description = b.description;
+    if (b.benefitForCity !== undefined) data.benefitForCity = b.benefitForCity;
+    if (b.targetGroup !== undefined) data.targetGroup = b.targetGroup || null;
+    if (b.location !== undefined) data.location = b.location || null;
+    if (b.estimatedBudget !== undefined) data.estimatedBudget = b.estimatedBudget === '' || b.estimatedBudget === null ? null : parseFloat(b.estimatedBudget);
+    if (b.requestedSupport !== undefined) data.requestedSupport = b.requestedSupport === '' || b.requestedSupport === null ? null : parseFloat(b.requestedSupport);
+    if (b.realizationDate !== undefined) data.realizationDate = b.realizationDate || null;
+    if (b.implementedBy !== undefined) data.implementedBy = b.implementedBy || null;
+    if (b.isLongTerm !== undefined) data.isLongTerm = !!b.isLongTerm;
+
+    // Doplňující informace
+    if (b.operatingCosts !== undefined) data.operatingCosts = b.operatingCosts || null;
+    if (b.maintainedBy !== undefined) data.maintainedBy = b.maintainedBy || null;
+    if (b.mainRisks !== undefined) data.mainRisks = b.mainRisks || null;
+    if (b.previouslyDiscussed !== undefined) data.previouslyDiscussed = b.previouslyDiscussed || null;
+    if (b.publicInterest !== undefined) data.publicInterest = !!b.publicInterest;
+    if (b.estimatedBeneficiaries !== undefined) data.estimatedBeneficiaries = b.estimatedBeneficiaries === '' || b.estimatedBeneficiaries === null ? null : parseInt(b.estimatedBeneficiaries);
+    if (b.category !== undefined) data.category = b.category;
+    if (b.budgetSize !== undefined) data.budgetSize = b.budgetSize;
+
+    // Administrativní
+    if (b.adminNote !== undefined) data.adminNote = b.adminNote || null;
+    if (b.foundationComment !== undefined) data.foundationComment = b.foundationComment || null;
+
+    const updated = await prisma.project.update({
+      where: { id: req.params.id },
+      data,
     });
 
     await logAudit({
