@@ -1,6 +1,9 @@
 const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 
-const transporter = nodemailer.createTransport({
+const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
+
+const transporter = process.env.SMTP_HOST ? nodemailer.createTransport({
   host: process.env.SMTP_HOST,
   port: parseInt(process.env.SMTP_PORT || '587'),
   secure: false,
@@ -8,16 +11,19 @@ const transporter = nodemailer.createTransport({
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,
   },
-});
+}) : null;
 
 async function sendEmail({ to, subject, html }) {
+  const from = process.env.SMTP_FROM || process.env.SMTP_USER;
   try {
-    await transporter.sendMail({
-      from: process.env.SMTP_FROM || process.env.SMTP_USER,
-      to,
-      subject,
-      html,
-    });
+    if (resend) {
+      const { error } = await resend.emails.send({ from, to, subject, html });
+      if (error) throw new Error(error.message || JSON.stringify(error));
+    } else if (transporter) {
+      await transporter.sendMail({ from, to, subject, html });
+    } else {
+      throw new Error('No email provider configured (set RESEND_API_KEY or SMTP_HOST)');
+    }
   } catch (error) {
     console.error('Email send failed:', error.message);
   }
