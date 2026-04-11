@@ -214,7 +214,11 @@ model ProjectReview {
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 
-  @@unique([projectId, reviewerId])
+  // Uniqueness (jeden review per reviewer per projekt) je vynucena na úrovni
+  // aplikace přes upsert v routes/reviews.js – schválně tu není @@unique,
+  // protože by `prisma db push` na Railway potřebovalo --accept-data-loss
+  // (Prisma ten constraint hlásí jako "možná ztráta dat").
+  @@index([projectId, reviewerId])
 }
 
 // ==================== HISTORIE STAVŮ PROJEKTU ====================

@@ -28,22 +28,32 @@ router.post('/', authenticate, requireRole('ADMIN', 'PROJECT_REVIEWER'), [
     const project = await prisma.project.findUnique({ where: { id: data.projectId } });
     if (!project) return res.status(404).json({ error: 'Projekt nenalezen.' });
 
-    const review = await prisma.projectReview.create({
-      data: {
-        projectId: data.projectId,
-        reviewerId: req.user.id,
-        statuteCompliance: data.statuteCompliance ? parseInt(data.statuteCompliance) : null,
-        publicBenefit: data.publicBenefit ? parseInt(data.publicBenefit) : null,
-        feasibility: data.feasibility ? parseInt(data.feasibility) : null,
-        budgetAdequacy: data.budgetAdequacy ? parseInt(data.budgetAdequacy) : null,
-        sustainability: data.sustainability ? parseInt(data.sustainability) : null,
-        technicalFeasibility: data.technicalFeasibility ? parseInt(data.technicalFeasibility) : null,
-        noPersonalGain: data.noPersonalGain !== false,
-        conflictRisk: data.conflictRisk ? parseInt(data.conflictRisk) : null,
-        overallRecommendation: data.overallRecommendation,
-        notes: data.notes || null,
-      },
+    // Aplikační uniqueness: jeden reviewer = jeden review na projekt.
+    // Schema nemá @@unique (kvůli Prisma data-loss varování na Railway db push),
+    // takže to ošetříme tady ručně – existující review téhož reviewera updatujeme.
+    const reviewPayload = {
+      statuteCompliance: data.statuteCompliance ? parseInt(data.statuteCompliance) : null,
+      publicBenefit: data.publicBenefit ? parseInt(data.publicBenefit) : null,
+      feasibility: data.feasibility ? parseInt(data.feasibility) : null,
+      budgetAdequacy: data.budgetAdequacy ? parseInt(data.budgetAdequacy) : null,
+      sustainability: data.sustainability ? parseInt(data.sustainability) : null,
+      technicalFeasibility: data.technicalFeasibility ? parseInt(data.technicalFeasibility) : null,
+      noPersonalGain: data.noPersonalGain !== false,
+      conflictRisk: data.conflictRisk ? parseInt(data.conflictRisk) : null,
+      overallRecommendation: data.overallRecommendation,
+      notes: data.notes || null,
+    };
+
+    const existing = await prisma.projectReview.findFirst({
+      where: { projectId: data.projectId, reviewerId: req.user.id },
+      select: { id: true },
     });
+
+    const review = existing
+      ? await prisma.projectReview.update({ where: { id: existing.id }, data: reviewPayload })
+      : await prisma.projectReview.create({
+          data: { projectId: data.projectId, reviewerId: req.user.id, ...reviewPayload },
+        });
 
     await logAudit({
       adminId: req.user.id,
