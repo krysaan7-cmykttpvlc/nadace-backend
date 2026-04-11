@@ -4,6 +4,7 @@ const prisma = require('../prisma');
 const { authenticate, requireApproved, requireRole } = require('../middleware/auth');
 const upload = require('../middleware/upload');
 const { logAudit } = require('../utils/audit');
+const logger = require('../utils/logger');
 
 const router = express.Router();
 
@@ -40,7 +41,7 @@ router.get('/public', async (req, res) => {
 
     res.json({ projects, total, page: parseInt(page), totalPages: Math.ceil(total / parseInt(limit)) });
   } catch (error) {
-    console.error('Public projects error:', error);
+    logger.error({ err: error }, 'Public projects error');
     res.status(500).json({ error: 'Chyba při načítání projektů.' });
   }
 });
@@ -95,7 +96,7 @@ router.get('/public/:id', async (req, res) => {
     if (!project) return res.status(404).json({ error: 'Projekt nenalezen.' });
     res.json(project);
   } catch (error) {
-    console.error('Public project detail error:', error);
+    logger.error({ err: error }, 'Public project detail error');
     res.status(500).json({ error: 'Chyba při načítání projektu.' });
   }
 });
@@ -168,7 +169,7 @@ router.post('/', authenticate, requireApproved, upload.array('attachments', 10),
 
     res.status(201).json({ message: 'Projekt byl úspěšně podán.', projectId: project.id });
   } catch (error) {
-    console.error('Submit project error:', error);
+    logger.error({ err: error }, 'Submit project error');
     res.status(500).json({ error: 'Chyba při podávání projektu.' });
   }
 });
@@ -186,7 +187,7 @@ router.get('/my', authenticate, async (req, res) => {
     });
     res.json(projects);
   } catch (error) {
-    console.error('My projects error:', error);
+    logger.error({ err: error }, 'My projects error');
     res.status(500).json({ error: 'Chyba při načítání projektů.' });
   }
 });
@@ -223,7 +224,7 @@ router.get('/admin', authenticate, requireRole('ADMIN', 'PROJECT_REVIEWER'), asy
 
     res.json({ projects, total, page: parseInt(page), totalPages: Math.ceil(total / parseInt(limit)) });
   } catch (error) {
-    console.error('Admin projects error:', error);
+    logger.error({ err: error }, 'Admin projects error');
     res.status(500).json({ error: 'Chyba při načítání projektů.' });
   }
 });
@@ -251,7 +252,7 @@ router.get('/admin/:id', authenticate, requireRole('ADMIN', 'PROJECT_REVIEWER'),
     if (!project) return res.status(404).json({ error: 'Projekt nenalezen.' });
     res.json(project);
   } catch (error) {
-    console.error('Admin project detail error:', error);
+    logger.error({ err: error }, 'Admin project detail error');
     res.status(500).json({ error: 'Chyba při načítání projektu.' });
   }
 });
@@ -310,7 +311,7 @@ router.patch('/:id/status', authenticate, requireRole('ADMIN', 'PROJECT_REVIEWER
 
     res.json({ message: `Stav projektu změněn na ${status}.`, project: { id: updated.id, status: updated.status } });
   } catch (error) {
-    console.error('Project status change error:', error);
+    logger.error({ err: error }, 'Project status change error');
     res.status(500).json({ error: 'Chyba při změně stavu projektu.' });
   }
 });
@@ -354,7 +355,7 @@ router.post('/:id/request-completion', authenticate, requireRole('ADMIN', 'PROJE
 
     res.json({ message: 'Žádost o doplnění odeslána.' });
   } catch (error) {
-    console.error('Request completion error:', error);
+    logger.error({ err: error }, 'Request completion error');
     res.status(500).json({ error: 'Chyba při žádosti o doplnění.' });
   }
 });
@@ -397,7 +398,7 @@ router.patch('/:id', authenticate, requireRole('ADMIN', 'PROJECT_REVIEWER'), asy
 
     res.json({ message: 'Projekt aktualizován.', project: { id: updated.id } });
   } catch (error) {
-    console.error('Update project error:', error);
+    logger.error({ err: error }, 'Update project error');
     res.status(500).json({ error: 'Chyba při aktualizaci projektu.' });
   }
 });
@@ -453,7 +454,7 @@ router.patch('/:id/internal', authenticate, requireRole('ADMIN', 'PROJECT_REVIEW
 
     res.json({ message: 'Interní údaje projektu uloženy.', project: { id: updated.id } });
   } catch (error) {
-    console.error('Update project internal error:', error);
+    logger.error({ err: error }, 'Update project internal error');
     res.status(500).json({ error: 'Chyba při ukládání interních údajů.' });
   }
 });

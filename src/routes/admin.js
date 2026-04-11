@@ -1,6 +1,7 @@
 const express = require('express');
 const prisma = require('../prisma');
 const { authenticate, requireRole } = require('../middleware/auth');
+const logger = require('../utils/logger');
 
 const router = express.Router();
 
@@ -28,7 +29,7 @@ router.get('/stats', authenticate, requireRole('ADMIN'), async (req, res) => {
       comments: totalComments,
     });
   } catch (error) {
-    console.error('Stats error:', error);
+    logger.error({ err: error }, 'Stats error');
     res.status(500).json({ error: 'Chyba při načítání statistik.' });
   }
 });
@@ -59,7 +60,7 @@ router.get('/audit-log', authenticate, requireRole('ADMIN'), async (req, res) =>
 
     res.json({ logs, total, page: parseInt(page), totalPages: Math.ceil(total / parseInt(limit)) });
   } catch (error) {
-    console.error('Audit log error:', error);
+    logger.error({ err: error }, 'Audit log error');
     res.status(500).json({ error: 'Chyba při načítání audit logu.' });
   }
 });
@@ -82,7 +83,7 @@ router.get('/export/users', authenticate, requireRole('ADMIN'), async (req, res)
     res.setHeader('Content-Disposition', 'attachment; filename=uzivatele_export.json');
     res.json(users);
   } catch (error) {
-    console.error('Export users error:', error);
+    logger.error({ err: error }, 'Export users error');
     res.status(500).json({ error: 'Chyba při exportu.' });
   }
 });
@@ -102,7 +103,7 @@ router.get('/export/projects', authenticate, requireRole('ADMIN'), async (req, r
     res.setHeader('Content-Disposition', 'attachment; filename=projekty_export.json');
     res.json(projects);
   } catch (error) {
-    console.error('Export projects error:', error);
+    logger.error({ err: error }, 'Export projects error');
     res.status(500).json({ error: 'Chyba při exportu.' });
   }
 });
@@ -126,7 +127,7 @@ router.get('/export/votes', authenticate, requireRole('ADMIN'), async (req, res)
     res.setHeader('Content-Disposition', 'attachment; filename=hlasovani_export.json');
     res.json(votes);
   } catch (error) {
-    console.error('Export votes error:', error);
+    logger.error({ err: error }, 'Export votes error');
     res.status(500).json({ error: 'Chyba při exportu.' });
   }
 });
@@ -141,7 +142,7 @@ router.get('/notifications', authenticate, async (req, res) => {
     });
     res.json(notifications);
   } catch (error) {
-    console.error('Notifications error:', error);
+    logger.error({ err: error }, 'Notifications error');
     res.status(500).json({ error: 'Chyba při načítání notifikací.' });
   }
 });
@@ -154,7 +155,7 @@ router.patch('/notifications/:id/read', authenticate, async (req, res) => {
     });
     res.json({ message: 'Notifikace označena jako přečtená.' });
   } catch (error) {
-    console.error('Mark notification read error:', error);
+    logger.error({ err: error }, 'Mark notification read error');
     res.status(500).json({ error: 'Chyba.' });
   }
 });

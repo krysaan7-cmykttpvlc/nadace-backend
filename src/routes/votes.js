@@ -3,6 +3,7 @@ const { body, validationResult } = require('express-validator');
 const prisma = require('../prisma');
 const { authenticate, requireApproved, requireMinMembership } = require('../middleware/auth');
 const { logAudit } = require('../utils/audit');
+const logger = require('../utils/logger');
 
 const router = express.Router();
 
@@ -96,7 +97,7 @@ router.post('/', authenticate, requireApproved, requireMinMembership, [
 
     res.status(201).json({ message: 'Hlas byl zaznamenán.', vote });
   } catch (error) {
-    console.error('Vote error:', error);
+    logger.error({ err: error }, 'Vote error');
     res.status(500).json({ error: 'Chyba při hlasování.' });
   }
 });
@@ -109,7 +110,7 @@ router.get('/my/:projectId', authenticate, async (req, res) => {
     });
     res.json({ vote: vote || null });
   } catch (error) {
-    console.error('My vote error:', error);
+    logger.error({ err: error }, 'My vote error');
     res.status(500).json({ error: 'Chyba při načítání hlasu.' });
   }
 });
@@ -132,7 +133,7 @@ router.get('/results/:projectId', authenticate, async (req, res) => {
       approvalRate: totalVotes > 0 ? ((project.votesFor / totalVotes) * 100).toFixed(1) : 0,
     });
   } catch (error) {
-    console.error('Vote results error:', error);
+    logger.error({ err: error }, 'Vote results error');
     res.status(500).json({ error: 'Chyba při načítání výsledků.' });
   }
 });

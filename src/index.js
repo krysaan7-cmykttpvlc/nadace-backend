@@ -14,6 +14,8 @@ const voteRoutes = require('./routes/votes');
 const commentRoutes = require('./routes/comments');
 const adminRoutes = require('./routes/admin');
 const cmsRoutes = require('./routes/cms');
+const { startRetentionScheduler } = require('./utils/retention');
+const logger = require('./utils/logger');
 
 const app = express();
 
@@ -88,7 +90,7 @@ app.get('/api/health', (req, res) => {
 
 // ==================== ERROR HANDLING ====================
 app.use((err, req, res, next) => {
-  console.error('Unhandled error:', err);
+  logger.error({ err, path: req.path, method: req.method }, 'Unhandled error');
   if (err.code === 'LIMIT_FILE_SIZE') {
     return res.status(413).json({ error: 'Soubor je příliš velký.' });
   }
@@ -99,6 +101,7 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 3001;
 const HOST = process.env.HOST || '0.0.0.0';
 app.listen(PORT, HOST, () => {
-  console.log(`Server běží na ${HOST}:${PORT}`);
-  console.log(`API: http://localhost:${PORT}/api`);
+  logger.info(`Server běží na ${HOST}:${PORT}`);
+  logger.info(`API: http://localhost:${PORT}/api`);
+  startRetentionScheduler();
 });

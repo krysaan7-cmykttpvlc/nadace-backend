@@ -99,12 +99,12 @@ model Project {
   summary             String
   description         String
   benefitForCity      String
-  targetGroup         String
-  location            String
-  estimatedBudget     Float
+  targetGroup         String?
+  location            String?
+  estimatedBudget     Float?
   requestedSupport    Float
   realizationDate     String
-  implementedBy       String
+  implementedBy       String?
   isLongTerm          Boolean  @default(false)
   declaration         Boolean  @default(false)
 

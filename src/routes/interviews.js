@@ -4,6 +4,7 @@ const prisma = require('../prisma');
 const { authenticate, requireRole } = require('../middleware/auth');
 const { logAudit } = require('../utils/audit');
 const { sendInterviewInviteEmail } = require('../utils/email');
+const logger = require('../utils/logger');
 
 const router = express.Router();
 
@@ -52,7 +53,7 @@ router.post('/', authenticate, requireRole('ADMIN', 'REGISTRATION_MANAGER'), [
 
     res.status(201).json({ message: 'Pohovor naplánován a pozvánka odeslána na e-mail.', interview });
   } catch (error) {
-    console.error('Schedule interview error:', error);
+    logger.error({ err: error }, 'Schedule interview error');
     res.status(500).json({ error: 'Chyba při plánování pohovoru.' });
   }
 });
@@ -79,7 +80,7 @@ router.get('/', authenticate, requireRole('ADMIN', 'REGISTRATION_MANAGER'), asyn
 
     res.json(interviews);
   } catch (error) {
-    console.error('List interviews error:', error);
+    logger.error({ err: error }, 'List interviews error');
     res.status(500).json({ error: 'Chyba při načítání pohovorů.' });
   }
 });
@@ -116,7 +117,7 @@ router.patch('/:id', authenticate, requireRole('ADMIN', 'REGISTRATION_MANAGER'),
 
     res.json({ message: 'Pohovor aktualizován.', interview });
   } catch (error) {
-    console.error('Update interview error:', error);
+    logger.error({ err: error }, 'Update interview error');
     res.status(500).json({ error: 'Chyba při aktualizaci pohovoru.' });
   }
 });

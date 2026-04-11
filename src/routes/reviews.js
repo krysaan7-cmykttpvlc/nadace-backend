@@ -3,6 +3,7 @@ const { body, validationResult } = require('express-validator');
 const prisma = require('../prisma');
 const { authenticate, requireRole } = require('../middleware/auth');
 const { logAudit } = require('../utils/audit');
+const logger = require('../utils/logger');
 
 const router = express.Router();
 
@@ -55,7 +56,7 @@ router.post('/', authenticate, requireRole('ADMIN', 'PROJECT_REVIEWER'), [
 
     res.status(201).json({ message: 'Recenze uložena.', review });
   } catch (error) {
-    console.error('Add review error:', error);
+    logger.error({ err: error }, 'Add review error');
     res.status(500).json({ error: 'Chyba při ukládání recenze.' });
   }
 });
@@ -70,7 +71,7 @@ router.get('/project/:projectId', authenticate, requireRole('ADMIN', 'PROJECT_RE
     });
     res.json(reviews);
   } catch (error) {
-    console.error('List reviews error:', error);
+    logger.error({ err: error }, 'List reviews error');
     res.status(500).json({ error: 'Chyba při načítání recenzí.' });
   }
 });

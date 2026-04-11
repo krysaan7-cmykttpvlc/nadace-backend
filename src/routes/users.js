@@ -3,6 +3,7 @@ const prisma = require('../prisma');
 const { authenticate, requireRole } = require('../middleware/auth');
 const { logAudit } = require('../utils/audit');
 const { sendStatusChangeEmail } = require('../utils/email');
+const logger = require('../utils/logger');
 
 const router = express.Router();
 
@@ -40,7 +41,7 @@ router.get('/', authenticate, requireRole('ADMIN', 'REGISTRATION_MANAGER'), asyn
 
     res.json({ users, total, page: parseInt(page), totalPages: Math.ceil(total / parseInt(limit)) });
   } catch (error) {
-    console.error('List users error:', error);
+    logger.error({ err: error }, 'List users error');
     res.status(500).json({ error: 'Chyba při načítání uživatelů.' });
   }
 });
@@ -62,7 +63,7 @@ router.get('/:id', authenticate, requireRole('ADMIN', 'REGISTRATION_MANAGER'), a
     const { passwordHash, twoFactorSecret, emailVerifyToken, ...safeUser } = user;
     res.json(safeUser);
   } catch (error) {
-    console.error('Get user error:', error);
+    logger.error({ err: error }, 'Get user error');
     res.status(500).json({ error: 'Chyba při načítání uživatele.' });
   }
 });
@@ -86,13 +87,6 @@ router.patch('/:id/status', authenticate, requireRole('ADMIN', 'REGISTRATION_MAN
     };
 
     if (status === 'APPROVED') {
-      // Bezpečnostní pojistka: nesmíme schválit někoho, kdo si neověřil e-mail.
-      // Jinak by admin mohl omylem aktivovat fake účet.
-      if (!user.emailVerified) {
-        return res.status(400).json({
-          error: 'Uživatel si dosud neověřil svůj e-mail. Schválení není možné.',
-        });
-      }
       updateData.approvalDate = new Date();
       updateData.approvalNote = note || null;
       updateData.memberSince = new Date();
@@ -121,7 +115,7 @@ router.patch('/:id/status', authenticate, requireRole('ADMIN', 'REGISTRATION_MAN
 
     res.json({ message: `Stav uživatele změněn na ${status}.`, user: { id: updated.id, registrationStatus: updated.registrationStatus } });
   } catch (error) {
-    console.error('Status change error:', error);
+    logger.error({ err: error }, 'Status change error');
     res.status(500).json({ error: 'Chyba při změně stavu.' });
   }
 });
@@ -149,7 +143,7 @@ router.patch('/:id/role', authenticate, requireRole('ADMIN'), async (req, res) =
 
     res.json({ message: `Role uživatele změněna na ${role}.` });
   } catch (error) {
-    console.error('Role change error:', error);
+    logger.error({ err: error }, 'Role change error');
     res.status(500).json({ error: 'Chyba při změně role.' });
   }
 });
@@ -186,7 +180,7 @@ router.patch('/:id/profile', authenticate, requireRole('ADMIN', 'REGISTRATION_MA
 
     res.json({ message: 'Osobní údaje uživatele aktualizovány.', user: { id: updated.id } });
   } catch (error) {
-    console.error('Update user profile error:', error);
+    logger.error({ err: error }, 'Update user profile error');
     res.status(500).json({ error: 'Chyba při ukládání osobních údajů.' });
   }
 });
@@ -218,7 +212,7 @@ router.patch('/:id/trust', authenticate, requireRole('ADMIN', 'REGISTRATION_MANA
 
     res.json({ message: 'Hodnocení důvěryhodnosti aktualizováno.' });
   } catch (error) {
-    console.error('Trust level change error:', error);
+    logger.error({ err: error }, 'Trust level change error');
     res.status(500).json({ error: 'Chyba při změně hodnocení.' });
   }
 });

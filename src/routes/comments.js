@@ -3,6 +3,7 @@ const { body, validationResult } = require('express-validator');
 const prisma = require('../prisma');
 const { authenticate, requireApproved, requireRole } = require('../middleware/auth');
 const { logAudit } = require('../utils/audit');
+const logger = require('../utils/logger');
 
 const router = express.Router();
 
@@ -55,7 +56,7 @@ router.post('/', authenticate, requireApproved, [
 
     res.status(201).json({ message: 'Komentář přidán.', comment });
   } catch (error) {
-    console.error('Add comment error:', error);
+    logger.error({ err: error }, 'Add comment error');
     res.status(500).json({ error: 'Chyba při přidávání komentáře.' });
   }
 });
@@ -70,7 +71,7 @@ router.get('/project/:projectId', async (req, res) => {
     });
     res.json(comments);
   } catch (error) {
-    console.error('List comments error:', error);
+    logger.error({ err: error }, 'List comments error');
     res.status(500).json({ error: 'Chyba při načítání komentářů.' });
   }
 });
@@ -85,7 +86,7 @@ router.get('/admin/:projectId', authenticate, requireRole('ADMIN', 'COMMENT_MODE
     });
     res.json(comments);
   } catch (error) {
-    console.error('Admin comments error:', error);
+    logger.error({ err: error }, 'Admin comments error');
     res.status(500).json({ error: 'Chyba při načítání komentářů.' });
   }
 });
@@ -115,7 +116,7 @@ router.patch('/:id/hide', authenticate, requireRole('ADMIN', 'COMMENT_MODERATOR'
 
     res.json({ message: 'Komentář byl skryt.' });
   } catch (error) {
-    console.error('Hide comment error:', error);
+    logger.error({ err: error }, 'Hide comment error');
     res.status(500).json({ error: 'Chyba při skrývání komentáře.' });
   }
 });
@@ -130,7 +131,7 @@ router.patch('/:id/unhide', authenticate, requireRole('ADMIN', 'COMMENT_MODERATO
 
     res.json({ message: 'Komentář byl odkryt.' });
   } catch (error) {
-    console.error('Unhide comment error:', error);
+    logger.error({ err: error }, 'Unhide comment error');
     res.status(500).json({ error: 'Chyba při odkrývání komentáře.' });
   }
 });
@@ -150,7 +151,7 @@ router.delete('/:id', authenticate, requireRole('ADMIN'), async (req, res) => {
 
     res.json({ message: 'Komentář byl smazán.' });
   } catch (error) {
-    console.error('Delete comment error:', error);
+    logger.error({ err: error }, 'Delete comment error');
     res.status(500).json({ error: 'Chyba při mazání komentáře.' });
   }
 });

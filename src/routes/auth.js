@@ -8,6 +8,7 @@ const { authenticate } = require('../middleware/auth');
 const crypto = require('crypto');
 const { sendVerificationEmail, sendPasswordResetEmail } = require('../utils/email');
 const { logAudit } = require('../utils/audit');
+const logger = require('../utils/logger');
 
 const router = express.Router();
 
@@ -77,7 +78,7 @@ router.post('/register', [
       userId: user.id,
     });
   } catch (error) {
-    console.error('Registration error:', error);
+    logger.error({ err: error }, 'Registration error');
     res.status(500).json({ error: 'Chyba při registraci.' });
   }
 });
@@ -113,7 +114,7 @@ router.get('/verify-email', async (req, res) => {
 
     res.json({ message: 'E-mail byl úspěšně ověřen. Vaše registrace čeká na schválení.' });
   } catch (error) {
-    console.error('Email verification error:', error);
+    logger.error({ err: error }, 'Email verification error');
     res.status(500).json({ error: 'Chyba při ověřování e-mailu.' });
   }
 });
@@ -153,7 +154,7 @@ router.post('/resend-verification', [
 
     res.json({ message: 'Pokud účet existuje a není ověřený, e-mail byl odeslán.' });
   } catch (error) {
-    console.error('Resend verification error:', error);
+    logger.error({ err: error }, 'Resend verification error');
     res.status(500).json({ error: 'Chyba při odesílání e-mailu.' });
   }
 });
@@ -240,7 +241,7 @@ router.post('/login', [
       },
     });
   } catch (error) {
-    console.error('Login error:', error);
+    logger.error({ err: error }, 'Login error');
     res.status(500).json({ error: 'Chyba při přihlášení.' });
   }
 });
@@ -317,8 +318,86 @@ router.patch('/me', authenticate, async (req, res) => {
 
     res.json({ message: 'Profil aktualizován.' });
   } catch (error) {
-    console.error('Update own profile error:', error);
+    logger.error({ err: error }, 'Update own profile error');
     res.status(500).json({ error: 'Chyba při ukládání profilu.' });
+  }
+});
+
+// ==================== EXPORT VLASTNÍCH DAT (GDPR – právo na přenositelnost, čl. 20) ====================
+router.get('/export-my-data', authenticate, async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const [user, projects, votes, comments, reviews, interviews] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          id: true, email: true, firstName: true, lastName: true,
+          dateOfBirth: true, addressStreet: true, addressCity: true, addressZip: true,
+          phone: true, isPermanentResident: true, emailVerified: true,
+          registrationStatus: true, trustLevel: true, role: true,
+          memberSince: true, createdAt: true, updatedAt: true,
+          gdprConsent: true, gdprConsentDate: true,
+          rulesConsent: true, rulesConsentDate: true,
+        },
+      }),
+      prisma.project.findMany({
+        where: { authorId: userId },
+        select: {
+          id: true, title: true, summary: true, description: true,
+          status: true, requestedSupport: true, realizationDate: true,
+          createdAt: true, updatedAt: true,
+        },
+      }),
+      prisma.vote.findMany({
+        where: { userId },
+        select: { id: true, projectId: true, value: true, comment: true, createdAt: true },
+      }),
+      prisma.comment.findMany({
+        where: { userId },
+        select: { id: true, projectId: true, content: true, createdAt: true },
+      }),
+      prisma.projectReview.findMany({
+        where: { reviewerId: userId },
+        select: {
+          id: true, projectId: true, overallRecommendation: true, notes: true,
+          createdAt: true,
+        },
+      }),
+      prisma.interview.findMany({
+        where: { userId },
+        select: {
+          id: true, scheduledDate: true, attended: true, result: true,
+          interviewerName: true, createdAt: true,
+        },
+      }),
+    ]);
+
+    await logAudit({
+      userId,
+      action: 'DATA_EXPORTED_SELF',
+      entity: 'User',
+      entityId: userId,
+      ipAddress: req.ip,
+      details: 'Export osobních údajů (GDPR čl. 20).',
+    });
+
+    const filename = `nadace-export-${userId.slice(0, 8)}-${new Date().toISOString().slice(0, 10)}.json`;
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(JSON.stringify({
+      exportedAt: new Date().toISOString(),
+      gdprNote: 'Tento soubor obsahuje veškeré osobní údaje, které o vás Nadace Pavelcových vede (GDPR čl. 20 – právo na přenositelnost údajů).',
+      user,
+      projects,
+      votes,
+      comments,
+      projectReviews: reviews,
+      interviews,
+    }, null, 2));
+  } catch (error) {
+    logger.error({ err: error }, 'Export data error');
+    res.status(500).json({ error: 'Chyba při exportu dat.' });
   }
 });
 
@@ -393,7 +472,7 @@ router.delete('/me', authenticate, [
 
     res.json({ message: 'Váš účet byl smazán. Vaše osobní údaje byly anonymizovány.' });
   } catch (error) {
-    console.error('Delete account error:', error);
+    logger.error({ err: error }, 'Delete account error');
     res.status(500).json({ error: 'Chyba při mazání účtu.' });
   }
 });
@@ -431,7 +510,7 @@ router.post('/change-password', authenticate, [
 
     res.json({ message: 'Heslo bylo úspěšně změněno.' });
   } catch (error) {
-    console.error('Password change error:', error);
+    logger.error({ err: error }, 'Password change error');
     res.status(500).json({ error: 'Chyba při změně hesla.' });
   }
 });
@@ -476,7 +555,7 @@ router.post('/forgot-password', [
 
     res.json({ message: 'Pokud účet s tímto e-mailem existuje, odeslali jsme odkaz pro obnovení hesla.' });
   } catch (error) {
-    console.error('Forgot password error:', error);
+    logger.error({ err: error }, 'Forgot password error');
     res.status(500).json({ error: 'Chyba při zpracování žádosti.' });
   }
 });
@@ -528,7 +607,7 @@ router.post('/reset-password', [
 
     res.json({ message: 'Heslo bylo úspěšně obnoveno. Nyní se můžete přihlásit.' });
   } catch (error) {
-    console.error('Reset password error:', error);
+    logger.error({ err: error }, 'Reset password error');
     res.status(500).json({ error: 'Chyba při obnovení hesla.' });
   }
 });

@@ -1,5 +1,6 @@
 const nodemailer = require('nodemailer');
 const { Resend } = require('resend');
+const logger = require('./logger');
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
@@ -25,7 +26,7 @@ async function sendEmail({ to, subject, html }) {
       throw new Error('No email provider configured (set RESEND_API_KEY or SMTP_HOST)');
     }
   } catch (error) {
-    console.error('Email send failed:', error.message);
+    logger.error({ err: error }, 'Email send failed');
   }
 }
 
