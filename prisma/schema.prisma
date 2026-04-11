@@ -66,6 +66,10 @@ model User {
   auditLogsAdmin     AuditLog[]     @relation("AuditLogAdmin")
   projectReviews     ProjectReview[]
   notifications      Notification[]
+
+  @@index([registrationStatus])
+  @@index([role])
+  @@index([createdAt])
 }
 
 // ==================== OSOBNÍ POHOVORY ====================
@@ -132,6 +136,11 @@ model Project {
   comments            Comment[]
   reviews             ProjectReview[]
   statusHistory       ProjectStatusHistory[]
+
+  @@index([status])
+  @@index([category])
+  @@index([authorId])
+  @@index([createdAt])
 }
 
 // ==================== PŘÍLOHY ====================
@@ -178,6 +187,8 @@ model Comment {
   hiddenReason String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+
+  @@index([projectId, isHidden])
 }
 
 // ==================== RECENZE PROJEKTŮ ====================
@@ -202,6 +213,8 @@ model ProjectReview {
   notes                 String?
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
+
+  @@unique([projectId, reviewerId])
 }
 
 // ==================== HISTORIE STAVŮ PROJEKTU ====================
@@ -231,6 +244,10 @@ model AuditLog {
   details   String?
   ipAddress String?
   createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([userId])
+  @@index([action])
 }
 
 // ==================== NOTIFIKACE ====================
@@ -245,6 +262,9 @@ model Notification {
   isRead    Boolean  @default(false)
   link      String?
   createdAt DateTime @default(now())
+
+  @@index([userId, isRead])
+  @@index([createdAt])
 }
 
 // ==================== CMS OBSAH ====================
