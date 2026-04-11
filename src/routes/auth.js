@@ -5,7 +5,8 @@ const { v4: uuidv4 } = require('uuid');
 const { body, validationResult } = require('express-validator');
 const prisma = require('../prisma');
 const { authenticate } = require('../middleware/auth');
-const { sendVerificationEmail } = require('../utils/email');
+const crypto = require('crypto');
+const { sendVerificationEmail, sendPasswordResetEmail } = require('../utils/email');
 const { logAudit } = require('../utils/audit');
 
 const router = express.Router();
@@ -264,6 +265,103 @@ router.post('/change-password', authenticate, [
   } catch (error) {
     console.error('Password change error:', error);
     res.status(500).json({ error: 'Chyba při změně hesla.' });
+  }
+});
+
+// ==================== ZAPOMENUTÉ HESLO ====================
+router.post('/forgot-password', [
+  body('email').isEmail().withMessage('Neplatný e-mail.'),
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+
+  try {
+    const { email } = req.body;
+    const user = await prisma.user.findUnique({ where: { email } });
+
+    if (!user) {
+      return res.json({ message: 'Pokud účet s tímto e-mailem existuje, odeslali jsme odkaz pro obnovení hesla.' });
+    }
+
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const resetExpires = new Date(Date.now() + 60 * 60 * 1000);
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordResetToken: resetToken,
+        passwordResetExpires: resetExpires,
+      },
+    });
+
+    await sendPasswordResetEmail(user.email, user.firstName, resetToken);
+
+    await logAudit({
+      userId: user.id,
+      action: 'PASSWORD_RESET_REQUESTED',
+      entity: 'User',
+      entityId: user.id,
+      ipAddress: req.ip,
+    });
+
+    res.json({ message: 'Pokud účet s tímto e-mailem existuje, odeslali jsme odkaz pro obnovení hesla.' });
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    res.status(500).json({ error: 'Chyba při zpracování žádosti.' });
+  }
+});
+
+// ==================== RESET HESLA ====================
+router.post('/reset-password', [
+  body('token').notEmpty().withMessage('Token je povinný.'),
+  body('newPassword').isLength({ min: 8 }).withMessage('Nové heslo musí mít alespoň 8 znaků.'),
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+
+  try {
+    const { token, newPassword } = req.body;
+
+    const user = await prisma.user.findFirst({
+      where: {
+        passwordResetToken: token,
+        passwordResetExpires: { gt: new Date() },
+      },
+    });
+
+    if (!user) {
+      return res.status(400).json({ error: 'Neplatný nebo vypršený token pro obnovení hesla.' });
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordHash,
+        passwordResetToken: null,
+        passwordResetExpires: null,
+        failedLoginAttempts: 0,
+        lockedUntil: null,
+      },
+    });
+
+    await logAudit({
+      userId: user.id,
+      action: 'PASSWORD_RESET',
+      entity: 'User',
+      entityId: user.id,
+      ipAddress: req.ip,
+    });
+
+    res.json({ message: 'Heslo bylo úspěšně obnoveno. Nyní se můžete přihlásit.' });
+  } catch (error) {
+    console.error('Reset password error:', error);
+    res.status(500).json({ error: 'Chyba při obnovení hesla.' });
   }
 });
 

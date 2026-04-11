@@ -46,6 +46,8 @@ model User {
   lastLoginIp        String?
   failedLoginAttempts Int     @default(0)
   lockedUntil        DateTime?
+  passwordResetToken   String?
+  passwordResetExpires DateTime?
 
   gdprConsent        Boolean  @default(false)
   gdprConsentDate    DateTime?

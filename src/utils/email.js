@@ -13,7 +13,7 @@ const transporter = nodemailer.createTransport({
 async function sendEmail({ to, subject, html }) {
   try {
     await transporter.sendMail({
-      from: process.env.SMTP_USER,
+      from: process.env.SMTP_FROM || process.env.SMTP_USER,
       to,
       subject,
       html,
@@ -74,4 +74,20 @@ async function sendInterviewInviteEmail(email, firstName, scheduledDate, intervi
   });
 }
 
-module.exports = { sendEmail, sendVerificationEmail, sendStatusChangeEmail, sendInterviewInviteEmail };
+async function sendPasswordResetEmail(email, firstName, token) {
+  const url = `${process.env.FRONTEND_URL}/reset-password?token=${token}`;
+  await sendEmail({
+    to: email,
+    subject: 'Obnovení hesla - Nadace Pavelcových',
+    html: `
+      <p>Dobrý den${firstName ? ', ' + firstName : ''},</p>
+      <p>obdrželi jsme žádost o obnovení hesla k vašemu účtu.</p>
+      <p>Pro nastavení nového hesla klikněte na tento odkaz:</p>
+      <p><a href="${url}">${url}</a></p>
+      <p>Odkaz je platný 1 hodinu. Pokud jste o obnovení hesla nežádali, tento e-mail ignorujte.</p>
+      <p>S pozdravem,<br>Nadace Inge a Miloše Pavelcových</p>
+    `,
+  });
+}
+
+module.exports = { sendEmail, sendVerificationEmail, sendStatusChangeEmail, sendInterviewInviteEmail, sendPasswordResetEmail };
